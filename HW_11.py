@@ -3,27 +3,6 @@ from datetime import datetime, timedelta
 import functools
 
 
-class AddressBook(UserDict):
-    def add_record(self, record):
-        self.data[record.name.value] = record
-
-    def __iter__(self):
-        return iter(self.data.values())
-
-    def iterator(self, n):
-        count = 0
-        current_page = []
-        for record in self:
-            current_page.append(record)
-            count += 1
-            if count == n:
-                yield current_page
-                current_page = []
-                count = 0
-        if current_page:
-            yield current_page
-
-
 class Field:
     def __init__(self, value=None):
         self._value = value
@@ -42,13 +21,10 @@ class Name(Field):
 
 
 class Phone(Field):
-    def __init__(self, value=None):
+    def __init__(self, value):
+        if not self._is_valid_phone(value):
+            raise ValueError("Неправильний формат номера.")
         super().__init__(value)
-        self._validate_phone()
-
-    def _validate_phone(self):
-        if self.value and not self._is_valid_phone():
-            raise ValueError("Invalid phone number format.")
 
     def _is_valid_phone(self):
         return len(str(self.value)) == 10
@@ -78,17 +54,15 @@ class Record:
             next_birthday = datetime(today.year, self.birthday.value.month, self.birthday.value.day).date()
             if today > next_birthday:
                 next_birthday = datetime(today.year + 1, self.birthday.value.month, self.birthday.value.day).date()
+                days_left = (next_birthday - today).days
             return (next_birthday - today).days
 
 
 class Birthday(Field):
-    def __init__(self, value=None):
+    def __init__(self, value):
+        if not self._is_valid_birthday(value):
+            raise ValueError("Неправильний формат дня народження.")
         super().__init__(value)
-        self._validate_birthday()
-
-    def _validate_birthday(self):
-        if self.value and not self._is_valid_birthday():
-            raise ValueError("Invalid birthday format.")
 
     def _is_valid_birthday(self):
         try:
@@ -98,96 +72,114 @@ class Birthday(Field):
             return False
 
 
-contacts = AddressBook()
+class AddressBook(UserDict):
+    def add_record(self, record):
+        self.data[record.name.value] = record
+
+    def __iter__(self):
+        return iter(self.data.values())
+
+    def iterator(self, n):
+        count = 0
+        current_page = []
+        for record in self:
+            current_page.append(record)
+            count += 1
+            if count == n:
+                yield current_page
+                current_page = []
+                count = 0
+        if current_page:
+            yield current_page
 
 
-def input_error(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except KeyError:
-            return "Контакт не найден"
-        except ValueError:
-            return "Неверный ввод. Пожалуйста, введите имя и телефон через пробел."
-        except IndexError:
-            return "Неверный ввод. Укажите имя."
+    def input_error(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except KeyError:
+                return "Контакт не найден"
+            except ValueError:
+                return "Неверный ввод. Пожалуйста, введите имя и телефон через пробел."
+            except IndexError:
+                return "Неверный ввод. Укажите имя."
 
-    return wrapper
-
-
-@input_error
-def add_contact(name, phone):
-    record = Record(name)
-    record.add_phone(phone)
-    contacts.add_record(record)
-    return "Контакт успешно добавлен."
+        return wrapper
 
 
-@input_error
-def change_contact(name, phone):
-    record = contacts.data.get(name)
-    if record:
-        record.edit_phone(record.phones[0].value, phone)
-        return "Контакт успешно обновлен."
-    raise KeyError
+    @input_error
+    def add_contact(name, phone):
+        record = Record(name)
+        record.add_phone(phone)
+        contacts.add_record(record)
+        return "Контакт успешно добавлен."
 
 
-@input_error
-def get_phone(name):
-    record = contacts.data.get(name)
-    if record:
-        return record.phones[0].value
-    raise KeyError
+    @input_error
+    def change_contact(name, phone):
+        record = contacts.data.get(name)
+        if record:
+            record.edit_phone(record.phones[0].value, phone)
+            return "Контакт успешно обновлен."
+        raise KeyError
 
 
-def show_all_contacts():
-    if not contacts.data:
-        return "Контакты не найдены."
-    result = ""
-    for record in contacts.data.values():
-        result += f"{record.name.value}: "
-        for phone in record.phones:
-            result += f"{phone.value}, "
-        result = result.rstrip(", ") + "\n"
-    return result.strip()
+    @input_error
+    def get_phone(name):
+        record = contacts.data.get(name)
+        if record:
+            return record.phones[0].value
+        raise KeyError
 
 
-def handle_command(command):
-    if command.lower() == "hello":
-        return "Могу я чем-нибудь помочь?"
-    elif command.lower().startswith("add"):
-        parts = command.split(" ", 2)
-        if len(parts) < 3:
-            raise ValueError
-        name, phone = parts[1], parts[2]
-        return add_contact(name, phone)
-    elif command.lower().startswith("change"):
-        parts = command.split(" ", 2)
-        if len(parts) < 3:
-            raise ValueError
-        name, phone = parts[1], parts[2]
-        return change_contact(name, phone)
-    elif command.lower().startswith("phone"):
-        parts = command.split(" ", 1)
-        if len(parts) < 2:
-            raise ValueError
-        name = parts[1]
-        return get_phone(name)
-    elif command.lower() == "show all":
-        return show_all_contacts()
-    elif command.lower() in ["good bye", "close", "exit"]:
-        return "До свидания!"
-    else:
-        return "Неверная команда. Пожалуйста, попробуйте еще ра."
+    def show_all_contacts():
+        if not contacts.data:
+            return "Контакты не найдены."
+        result = ""
+        for record in contacts.data.values():
+            result += f"{record.name.value}: "
+            for phone in record.phones:
+                result += f"{phone.value}, "
+            result = result.rstrip(", ") + "\n"
+        return result.strip()
 
-def main():
-    while True:
-        command = input("Введите команду: ")
-        response = handle_command(command)
-        print(response)
-        if response == "До свидания!":
-            break
+
+    def handle_command(command):
+        if command.lower() == "hello":
+            return "Могу я чем-нибудь помочь?"
+        elif command.lower().startswith("add"):
+            parts = command.split(" ", 2)
+            if len(parts) < 3:
+                raise ValueError
+            name, phone = parts[1], parts[2]
+            return add_contact(name, phone)
+        elif command.lower().startswith("change"):
+            parts = command.split(" ", 2)
+            if len(parts) < 3:
+                raise ValueError
+            name, phone = parts[1], parts[2]
+            return change_contact(name, phone)
+        elif command.lower().startswith("phone"):
+            parts = command.split(" ", 1)
+            if len(parts) < 2:
+                raise ValueError
+            name = parts[1]
+            return get_phone(name)
+        elif command.lower() == "show all":
+            return show_all_contacts()
+        elif command.lower() in ["good bye", "close", "exit"]:
+            return "До свидания!"
+        else:
+            return "Неверная команда. Пожалуйста, попробуйте еще раз."
+
+    def main():
+        while True:
+            command = input("Введите команду: ")
+            response = handle_command(command)
+            print(response)
+            if response == "До свидания!":
+                break
 
 if __name__ == "__main__":
     main()
