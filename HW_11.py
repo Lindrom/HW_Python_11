@@ -2,7 +2,6 @@ from collections import UserDict
 from datetime import datetime, timedelta
 import functools
 
-
 class Field:
     def __init__(self, value=None):
         self._value = value
@@ -54,14 +53,14 @@ class Record:
             next_birthday = datetime(today.year, self.birthday.value.month, self.birthday.value.day).date()
             if today > next_birthday:
                 next_birthday = datetime(today.year + 1, self.birthday.value.month, self.birthday.value.day).date()
-                days_left = (next_birthday - today).days
-            return (next_birthday - today).days
+            days_left = (next_birthday - today).days
+            return days_left
 
 
 class Birthday(Field):
     def __init__(self, value):
         if not self._is_valid_birthday(value):
-            raise ValueError("Неправильний формат дня народження.")
+            raise ValueError("Неправильный формат дня рождения.")
         super().__init__(value)
 
     def _is_valid_birthday(self):
@@ -93,93 +92,97 @@ class AddressBook(UserDict):
             yield current_page
 
 
-    def input_error(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except KeyError:
-                return "Контакт не найден"
-            except ValueError:
-                return "Неверный ввод. Пожалуйста, введите имя и телефон через пробел."
-            except IndexError:
-                return "Неверный ввод. Укажите имя."
 
-        return wrapper
+contacts = AddressBook()
 
 
-    @input_error
-    def add_contact(name, phone):
-        record = Record(name)
-        record.add_phone(phone)
-        contacts.add_record(record)
-        return "Контакт успешно добавлен."
+def input_error(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except KeyError:
+            return "Контакт не найден"
+        except ValueError:
+            return "Неверный ввод. Пожалуйста, введите имя и телефон через пробел."
+        except IndexError:
+            return "Неверный ввод. Укажите имя."
+
+    return wrapper
 
 
-    @input_error
-    def change_contact(name, phone):
-        record = contacts.data.get(name)
-        if record:
-            record.edit_phone(record.phones[0].value, phone)
-            return "Контакт успешно обновлен."
-        raise KeyError
+@input_error
+def add_contact(name, phone):
+    record = Record(name)
+    record.add_phone(phone)
+    contacts.add_record(record)
+    return "Контакт успешно добавлен."
 
 
-    @input_error
-    def get_phone(name):
-        record = contacts.data.get(name)
-        if record:
-            return record.phones[0].value
-        raise KeyError
+@input_error
+def change_contact(name, phone):
+    record = contacts.data.get(name)
+    if record:
+        record.edit_phone(record.phones[0].value, phone)
+        return "Контакт успешно обновлен."
+    raise KeyError
 
 
-    def show_all_contacts():
-        if not contacts.data:
-            return "Контакты не найдены."
-        result = ""
-        for record in contacts.data.values():
-            result += f"{record.name.value}: "
-            for phone in record.phones:
-                result += f"{phone.value}, "
-            result = result.rstrip(", ") + "\n"
-        return result.strip()
+@input_error
+def get_phone(name):
+    record = contacts.data.get(name)
+    if record:
+        return record.phones[0].value
+    raise KeyError
 
 
-    def handle_command(command):
-        if command.lower() == "hello":
-            return "Могу я чем-нибудь помочь?"
-        elif command.lower().startswith("add"):
-            parts = command.split(" ", 2)
-            if len(parts) < 3:
-                raise ValueError
-            name, phone = parts[1], parts[2]
-            return add_contact(name, phone)
-        elif command.lower().startswith("change"):
-            parts = command.split(" ", 2)
-            if len(parts) < 3:
-                raise ValueError
-            name, phone = parts[1], parts[2]
-            return change_contact(name, phone)
-        elif command.lower().startswith("phone"):
-            parts = command.split(" ", 1)
-            if len(parts) < 2:
-                raise ValueError
-            name = parts[1]
-            return get_phone(name)
-        elif command.lower() == "show all":
-            return show_all_contacts()
-        elif command.lower() in ["good bye", "close", "exit"]:
-            return "До свидания!"
-        else:
-            return "Неверная команда. Пожалуйста, попробуйте еще раз."
+def show_all_contacts():
+    if not contacts.data:
+        return "Контакты не найдены."
+    result = ""
+    for record in contacts.data.values():
+        result += f"{record.name.value}: "
+        for phone in record.phones:
+            result += f"{phone.value}, "
+        result = result.rstrip(", ") + "\n"
+    return result.strip()
 
-    def main():
-        while True:
-            command = input("Введите команду: ")
-            response = handle_command(command)
-            print(response)
-            if response == "До свидания!":
-                break
+
+def handle_command(command):
+    if command.lower() == "hello":
+        return "Могу я чем-нибудь помочь?"
+    elif command.lower().startswith("add"):
+        parts = command.split(" ", 2)
+        if len(parts) < 3:
+            raise ValueError
+        name, phone = parts[1], parts[2]
+        return add_contact(name, phone)
+    elif command.lower().startswith("change"):
+        parts = command.split(" ", 2)
+        if len(parts) < 3:
+            raise ValueError
+        name, phone = parts[1], parts[2]
+        return change_contact(name, phone)
+    elif command.lower().startswith("phone"):
+        parts = command.split(" ", 1)
+        if len(parts) < 2:
+            raise ValueError
+        name = parts[1]
+        return get_phone(name)
+    elif command.lower() == "show all":
+        return show_all_contacts()
+    elif command.lower() in ["good bye", "close", "exit"]:
+        return "До свидания!"
+    else:
+        return "Неверная команда. Пожалуйста, попробуйте еще раз."
+
+def main():
+    while True:
+        command = input("Введите команду: ")
+        response = handle_command(command)
+        print(response)
+        if response == "До свидания!":
+            break
 
 if __name__ == "__main__":
     main()
